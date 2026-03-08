@@ -41,12 +41,17 @@ class PlexMCPNotFoundError(PlexMCPError):
 
 # --- Utility Formatting Functions ---
 
-MAX_LIMIT = 50
-MAX_COUNT = 50
-MAX_KEYS = 100
-MAX_STATS_LEAVES = 5_000  # Max leaf items (episodes/tracks) scanned per section in get_library_stats
+MAX_LIMIT: int = 50
+MAX_COUNT: int = 50
+MAX_KEYS: int = 100
+MAX_STATS_LEAVES: int = 5_000  # Max leaf items (episodes/tracks) scanned per section in get_library_stats
 
-def clamp(value, minimum, maximum):
+DEFAULT_LIMIT: int = 5
+DEFAULT_COUNT: int = 10
+DEFAULT_MUSIC_LIMIT: int = 10
+
+
+def clamp(value: Any, minimum: Any, maximum: Any) -> Any:
     """
     Clamp a value to a given range.
     """
@@ -65,7 +70,8 @@ def clamp_int(value: Optional[int], default: int, minimum: int, maximum: int) ->
         return default
     return clamp(value, minimum, maximum)
 
-def format_movie(movie) -> str:
+
+def format_movie(movie: Any) -> str:
     """
     Format a movie object into a human-readable string.
     
@@ -97,7 +103,7 @@ def format_movie(movie) -> str:
         f"Summary: {summary}\n"
     )
 
-def format_playlist(playlist, items=None) -> str:
+def format_playlist(playlist: Any, items: Optional[list] = None) -> str:
     """
     Format a playlist into a human-readable string.
     
@@ -128,7 +134,7 @@ class PlexClient:
     Encapsulate the Plex connection logic.
     This class handles initialization and caching of the PlexServer instance.
     """
-    def __init__(self, server_url: str = None, token: str = None):
+    def __init__(self, server_url: Optional[str] = None, token: Optional[str] = None) -> None:
         self.server_url = server_url or os.environ.get("PLEX_SERVER_URL", "").rstrip("/")
         self.token = token or os.environ.get("PLEX_TOKEN")
         
@@ -196,7 +202,7 @@ class MovieSearchParams:
     min_duration: Optional[int]  = None   # in minutes
     max_duration: Optional[int]  = None   # in minutes
 
-    def to_filters(self) -> Dict[str, Any]:
+    def to_filters(self) -> dict[str, Any]:
         # Simple equality filters mapped directly to section.search() kwargs
         FIELD_MAP = {
             "title":    "title",
@@ -280,7 +286,7 @@ async def search_movies(
     watched:      Optional[bool] = None,
     min_duration: Optional[int]  = None,
     max_duration: Optional[int]  = None,
-    limit:        Optional[int]  = 5,
+    limit:        Optional[int]  = DEFAULT_LIMIT,
 ) -> str:
     """
     Search for movies in your Plex library using optional filters.
@@ -611,7 +617,7 @@ async def add_to_playlist(playlist_key: str, movie_key: str) -> str:
         raise PlexMCPError("Failed to add movie to playlist.") from e
 
 @mcp.tool()
-async def recent_movies(count: int = 5) -> str:
+async def recent_movies(count: int = DEFAULT_LIMIT) -> str:
     """
     Get recently added movies from the Plex library.
     
@@ -686,7 +692,7 @@ async def get_movie_genres(movie_key: str) -> str:
 @mcp.tool()
 async def most_watched(
     media_type: str = "movies",
-    count: int = 10,
+    count: int = DEFAULT_COUNT,
 ) -> str:
     """
     Get the most watched movies or TV shows sorted by play count.
@@ -736,7 +742,7 @@ async def most_watched(
 
 
 @mcp.tool()
-async def get_watch_history(count: int = 10) -> str:
+async def get_watch_history(count: int = DEFAULT_COUNT) -> str:
     """
     Get recently played items across all libraries.
 
@@ -896,7 +902,7 @@ async def search_tv_shows(
     actor: Optional[str] = None,
     studio: Optional[str] = None,
     watched: Optional[bool] = None,
-    limit: int = 5,
+    limit: int = DEFAULT_LIMIT,
 ) -> str:
     """
     Search for TV shows in the Plex library.
@@ -1008,7 +1014,7 @@ async def get_show_details(show_key: str) -> str:
 
 
 @mcp.tool()
-async def get_similar_movies(movie_key: str, limit: int = 5) -> str:
+async def get_similar_movies(movie_key: str, limit: int = DEFAULT_LIMIT) -> str:
     """
     Get movies similar to a given movie based on Plex recommendations.
 
@@ -1049,7 +1055,7 @@ async def search_music(
     album: Optional[str] = None,
     track: Optional[str] = None,
     genre: Optional[str] = None,
-    limit: int = 10,
+    limit: int = DEFAULT_MUSIC_LIMIT,
 ) -> str:
     """
     Search for music in the Plex library by artist, album, track, or genre.

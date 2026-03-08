@@ -227,17 +227,23 @@ If you are experiencing connection issues to your Plex server try running the in
 
 ## Code Style and Conventions
 
-- **Module Structure:**  
+- **Module Structure:**
   Use clear section headers for imports, logging setup, utility functions, class definitions, global helpers, tool methods, and main execution (guarded by `if __name__ == "__main__":`).
 
-- **Naming:**  
+- **Naming:**
   Use CamelCase for classes and lower_snake_case for functions, variables, and fixtures. In tests, list built-in fixtures (e.g. `monkeypatch`) before custom ones.
 
-- **Documentation & Comments:**  
+- **Constants:**
+  Define configuration values and fixed parameters using `UPPER_CASE` (e.g. `MAX_LIMIT`, `DEFAULT_COUNT`). Declare constants near the top of the module after imports; do not modify them at runtime.
+
+- **Type Hints:**
+  Provide type hints for all function parameters and return values. Use built-in generics (`list[str]`, `dict[str, Any]`) and standard typing constructs (`Optional`, `Any`, etc.).
+
+- **Documentation & Comments:**
   Include a concise docstring for every module, class, and function, with in-line comments for complex logic.
 
 - **Error Handling & Logging:**
-  Use Python’s `logging` module with descriptive error messages and explicit exception handling. Raise `PlexMCPError` (or a subclass) for tool errors rather than returning error strings.
+  Use Python’s `logging` module with parameterized messages (e.g. `logger.error("Failed: %s", err)`) rather than f-strings. Raise `PlexMCPError` (or a subclass) for tool errors rather than returning error strings.
 
-- **Asynchronous Patterns:**  
+- **Asynchronous Patterns:**
   Define I/O-bound functions as async and use `asyncio.to_thread()` to handle blocking operations.
