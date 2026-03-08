@@ -521,7 +521,8 @@ async def create_playlist(name: str, item_keys: str) -> str:
             raise PlexMCPError("No valid items found with the provided keys.")
 
         list_types = {getattr(item, 'listType', None) for item in items}
-        if len(list_types) > 1:
+        known_types = {t for t in list_types if t is not None}
+        if len(known_types) > 1:
             raise PlexMCPError(
                 "Cannot mix media types in a playlist. "
                 "All items must be the same type (all video or all audio)."
@@ -727,14 +728,15 @@ async def most_watched(
     count: int = DEFAULT_COUNT,
 ) -> str:
     """
-    Get the most watched movies or TV shows sorted by play count.
+    Get the most watched movies or recently watched TV shows.
 
     Parameters:
         media_type: Either "movies" or "shows" (default: "movies").
         count: Number of results to return (default: 10).
 
     Returns:
-        A formatted list of most watched media sorted by play count descending.
+        For movies: sorted by play count descending.
+        For shows: sorted by last viewed date descending.
     """
     if media_type not in ("movies", "shows"):
         raise PlexMCPError("media_type must be 'movies' or 'shows'.")
@@ -800,6 +802,11 @@ async def get_watch_history(count: int = DEFAULT_COUNT) -> str:
         account_id = next(
             (a.id for a in system_accounts if a.name == my_account.username), None
         )
+        if account_id is None:
+            raise PlexMCPError(
+                "Could not resolve the authenticated user account. "
+                "Watch history cannot be scoped to a single user."
+            )
         history = await asyncio.to_thread(
             lambda: plex.history(maxresults=count, accountID=account_id)
         )
@@ -819,6 +826,8 @@ async def get_watch_history(count: int = DEFAULT_COUNT) -> str:
 
         return "\n".join(results)
     except PlexMCPConnectionError:
+        raise
+    except PlexMCPError:
         raise
     except Exception as e:
         logger.exception("Failed to fetch watch history")
@@ -1069,7 +1078,7 @@ async def get_similar_movies(movie_key: str, limit: int = DEFAULT_LIMIT) -> str:
         results = [f"Movies similar to '{movie.title}':\n"]
         limit = clamp_int(limit, default=5, minimum=1, maximum=MAX_LIMIT)
         for i, m in enumerate(related[:limit], 1):
-            results.append(f"{i}. {m.tag}")
+            results.append(f"{i}. {getattr(m, 'title', getattr(m, 'tag', 'Unknown'))}")
 
         return "\n".join(results)
     except PlexMCPConnectionError:
@@ -1105,7 +1114,7 @@ async def get_similar_artists(artist_key: str, limit: int = DEFAULT_LIMIT) -> st
         results = [f"Artists similar to '{artist.title}':\n"]
         limit = clamp_int(limit, default=DEFAULT_LIMIT, minimum=1, maximum=MAX_LIMIT)
         for i, a in enumerate(related[:limit], 1):
-            results.append(f"{i}. {a.tag}")
+            results.append(f"{i}. {getattr(a, 'title', getattr(a, 'tag', 'Unknown'))}")
 
         return "\n".join(results)
     except PlexMCPConnectionError:

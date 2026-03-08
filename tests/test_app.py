@@ -448,6 +448,15 @@ async def test_create_playlist_mixed_types_rejected(patch_plex_extended):
         await create_playlist("Bad Mix", "1,101")
 
 @pytest.mark.asyncio
+async def test_create_playlist_unknown_list_type_allowed(patch_plex_extended):
+    """Test that create_playlist allows items where listType is None (unknown type)."""
+    movie = DummyMovie(1, "Some Movie")
+    movie.listType = None  # simulate missing listType
+    patch_plex_extended(movies=[movie])
+    result = await create_playlist("Uncertain Mix", "1")
+    assert "Successfully created playlist" in result
+
+@pytest.mark.asyncio
 async def test_create_playlist_no_valid_items(patch_get_plex_server):
     """Test that create_playlist returns an error when no valid item keys are found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
@@ -862,6 +871,20 @@ async def test_get_watch_history_invalid_count(patch_plex_extended):
     patch_plex_extended()
     with pytest.raises(PlexMCPError):
         await get_watch_history(count=0)
+
+
+@pytest.mark.asyncio
+async def test_get_watch_history_unresolvable_account(patch_plex_extended):
+    """Test get_watch_history raises error when account ID cannot be resolved."""
+    from plex_mcp.plex_mcp import PlexMCPError
+
+    # Patch the server so the authenticated username doesn't match any system account.
+    server = patch_plex_extended(history=[])
+    server.myPlexAccount = lambda: type("Acct", (), {"username": "ghost"})()
+    server.systemAccounts = lambda: [type("SA", (), {"id": 1, "name": "someone_else"})()]
+
+    with pytest.raises(PlexMCPError, match="Could not resolve the authenticated user account"):
+        await get_watch_history()
 
 
 # --- Tests for get_on_deck ---
