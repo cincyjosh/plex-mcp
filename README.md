@@ -32,8 +32,14 @@ Here are some examples of things you can ask Claude using this MCP server:
 
 ### TV Shows
 
-**Search shows**
-> "Do I have any sci-fi TV shows in my library?"
+**Find something to watch**
+> "Recommend a TV show from my library I haven't watched yet"
+
+**Search by genre and year**
+> "Find drama shows from 2020 or later"
+
+**Check what's in progress**
+> "What TV shows have I started watching?"
 
 **Show details**
 > "How many seasons of Breaking Bad do I have?"
@@ -42,18 +48,27 @@ Here are some examples of things you can ask Claude using this MCP server:
 
 ### Music
 
-**Find an artist**
-> "What albums do I have by 2Pac?"
+**Search by genre**
+> "Find all hip hop artists in my library"
+
+**Browse an artist's discography**
+> "Show me all albums by Radiohead"
 
 **Browse a tracklist**
-> "Show me the tracks on Abbey Road"
+> "Show me the tracks on Abbey Road by The Beatles"
+
+**Discover similar artists**
+> "Show me artists in my library similar to Billy Strings"
 
 ---
 
 ### Playlists
 
-**Create a playlist**
+**Create a movie playlist**
 > "Create a playlist called 'Date Night' with the Christopher Nolan movies from my library"
+
+**Create a music playlist**
+> "Create a playlist about 2 hours long with music from the 80s"
 
 **Browse playlists**
 > "What playlists do I have?"
