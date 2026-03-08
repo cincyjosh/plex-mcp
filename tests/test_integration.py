@@ -31,6 +31,7 @@ from plex_mcp import (
     search_music,
     get_artist_details,
     get_album_details,
+    get_similar_artists,
 )
 
 pytestmark = pytest.mark.integration
@@ -259,6 +260,16 @@ async def test_integration_get_artist_details():
     assert isinstance(details, str)
     assert "Artist:" in details
     assert "Albums" in details
+
+
+@pytest.mark.asyncio
+async def test_integration_get_similar_artists():
+    result = await search_music(artist="a", limit=1)
+    key = _first_key_from_result(result)
+    assert key, "Could not extract artist key from search result"
+    similar = await get_similar_artists(key, limit=5)
+    assert isinstance(similar, str)
+    assert "Failed" not in similar
 
 
 @pytest.mark.asyncio

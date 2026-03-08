@@ -67,8 +67,11 @@ Here are some examples of things you can ask Claude using this MCP server:
 **Create a movie playlist**
 > "Create a playlist called 'Date Night' with the Christopher Nolan movies from my library"
 
-**Create a music playlist**
-> "Create a playlist about 2 hours long with music from the 80s"
+**Create a music playlist from specific tracks**
+> "Create a playlist called 'Road Trip' with the top tracks from Tom Petty's greatest hits album"
+
+**Create a music playlist by genre and era**
+> "Create a playlist about 2 hours long with hip hop tracks from my library"
 
 **Browse playlists**
 > "What playlists do I have?"
@@ -173,21 +176,22 @@ Add the following configuration to your Claude app:
 
 ### Music
 
-| Command              | Description                                                                 |
-|----------------------|-----------------------------------------------------------------------------|
-| `search_music`       | Search for artists, albums, or tracks by name or genre.                    |
-| `get_artist_details` | Get artist info and a full list of their albums.                           |
-| `get_album_details`  | Get album info and full track listing with durations.                      |
+| Command               | Description                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| `search_music`        | Search for artists, albums, or tracks by name or genre.                    |
+| `get_artist_details`  | Get artist info and a full list of their albums with keys.                  |
+| `get_album_details`   | Get album info and full track listing with durations and individual track keys. |
+| `get_similar_artists` | Get Plex-recommended artists similar to a given artist.                    |
 
 ### Playlists
 
 | Command              | Description                                                                 |
 |----------------------|-----------------------------------------------------------------------------|
 | `list_playlists`     | List all playlists on your Plex server.                                    |
-| `get_playlist_items` | Get the items in a specific playlist.                                      |
-| `create_playlist`    | Create a new playlist with specified movies.                               |
+| `get_playlist_items` | Get the items in a specific playlist, including artist/album context for tracks and show/season context for episodes. |
+| `create_playlist`    | Create a new playlist with movies, individual tracks, or episodes.         |
 | `delete_playlist`    | Delete a playlist from your Plex server.                                   |
-| `add_to_playlist`    | Add a movie to an existing playlist.                                       |
+| `add_to_playlist`    | Add any media item (movie, track, episode) to an existing playlist.        |
 
 ### Watch Activity
 
@@ -199,7 +203,8 @@ Add the following configuration to your Claude app:
 
 ## Operational Notes
 
-- Result limits are capped to prevent accidental heavy queries (`limit`/`count` max is 50, `create_playlist` accepts up to 100 movie keys).
+- Result limits are capped to prevent accidental heavy queries (`limit`/`count` max is 50, `create_playlist` accepts up to 100 item keys).
+- Playlists must contain a single media type — all audio (tracks) or all video (movies/episodes). Mixing types is rejected before the Plex API is called.
 - `get_library_stats` scans up to 5,000 episodes/tracks per library section to calculate runtime and storage. Libraries exceeding this cap will show a `(capped at 5000)` note next to the count; item counts for top-level shows/artists are always exact.
 - The Plex connection is cached and automatically re-established if it goes stale (e.g. after a server restart). Invalid tokens surface immediately without retrying.
 - Tools raise `PlexMCPError`/`PlexMCPNotFoundError` for invalid inputs or missing items; MCP clients will surface these as tool errors rather than `"ERROR: ..."` strings.

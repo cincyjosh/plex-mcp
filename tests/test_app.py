@@ -26,6 +26,7 @@ from plex_mcp import (
     search_tv_shows,
     get_show_details,
     get_similar_movies,
+    get_similar_artists,
     search_music,
     get_artist_details,
     get_album_details,
@@ -73,6 +74,7 @@ class DummyMovie:
         self.roles = [DummyTag(r) for r in (roles or [])]
         self.genres = [DummyTag(g) for g in (genres or [])]
         self.type = type_
+        self.listType = "video"
         self.addedAt = addedAt  # New attribute
 
 # Subclass for movies with genres.
@@ -389,6 +391,32 @@ async def test_get_playlist_items_not_found(patch_get_plex_server):
     with pytest.raises(PlexMCPNotFoundError):
         await get_playlist_items("99")
 
+@pytest.mark.asyncio
+async def test_get_playlist_items_with_track(patch_plex_extended):
+    """Test that get_playlist_items formats track items with artist, album, duration, and key."""
+    track = DummyTrack(42, "Come Together", duration_ms=259000, track_number=1,
+                       parent_title="Abbey Road", grandparent_title="The Beatles")
+    dummy_playlist = DummyPlaylist(2, "My Music", [track])
+    patch_plex_extended(tracks=[track])
+    # Manually wire the playlist into patch_plex_extended via extended server
+    from unittest.mock import AsyncMock, MagicMock, patch as mock_patch
+    from plex_mcp import plex_mcp as module
+
+    dummy_server = MagicMock()
+    dummy_server.fetchItem.return_value = dummy_playlist
+    dummy_server.playlists.return_value = [dummy_playlist]
+
+    async def fake_get_plex():
+        return dummy_server
+
+    with mock_patch.object(module, "get_plex_server", fake_get_plex):
+        result = await get_playlist_items("2")
+
+    assert "Come Together" in result
+    assert "The Beatles" in result
+    assert "Abbey Road" in result
+    assert "[key: 42]" in result
+
 # --- Tests for create_playlist ---
 
 @pytest.mark.asyncio
@@ -400,8 +428,28 @@ async def test_create_playlist_success(patch_get_plex_server, dummy_movie):
     assert "Successfully created playlist 'My Playlist'" in result
 
 @pytest.mark.asyncio
-async def test_create_playlist_no_valid_movies(patch_get_plex_server):
-    """Test that create_playlist returns an error when no valid movies are provided."""
+async def test_create_playlist_with_tracks(patch_plex_extended):
+    """Test that create_playlist works with individual track keys."""
+    track1 = DummyTrack(101, "Come Together", parent_title="Abbey Road", grandparent_title="The Beatles")
+    track2 = DummyTrack(102, "Something", parent_title="Abbey Road", grandparent_title="The Beatles")
+    patch_plex_extended(tracks=[track1, track2])
+    result = await create_playlist("Beatles Mix", "101,102")
+    assert "Successfully created playlist 'Beatles Mix'" in result
+    assert "2 item(s)" in result
+
+@pytest.mark.asyncio
+async def test_create_playlist_mixed_types_rejected(patch_plex_extended):
+    """Test that create_playlist rejects mixed audio/video items."""
+    from plex_mcp.plex_mcp import PlexMCPError
+    movie = DummyMovie(1, "Some Movie")
+    track = DummyTrack(101, "Some Track")
+    patch_plex_extended(movies=[movie], tracks=[track])
+    with pytest.raises(PlexMCPError, match="Cannot mix media types"):
+        await create_playlist("Bad Mix", "1,101")
+
+@pytest.mark.asyncio
+async def test_create_playlist_no_valid_items(patch_get_plex_server):
+    """Test that create_playlist returns an error when no valid item keys are found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
     patch_get_plex_server([])
 
@@ -432,7 +480,7 @@ async def test_delete_playlist_not_found(patch_get_plex_server):
 
 @pytest.mark.asyncio
 async def test_add_to_playlist_success(patch_get_plex_server):
-    """Test that add_to_playlist returns a success message when a movie is added."""
+    """Test that add_to_playlist returns a success message when an item is added."""
     dummy_playlist = DummyPlaylist(4, "My Playlist", [])
     dummy_movie = DummyMovie(5, "Added Movie")
     patch_get_plex_server([dummy_movie], playlists=[dummy_playlist])
@@ -546,6 +594,7 @@ class DummyTrack:
         self.parentTitle = parent_title
         self.grandparentTitle = grandparent_title
         self.type = "track"
+        self.listType = "audio"
 
 
 class DummyAlbum:
@@ -954,6 +1003,38 @@ async def test_get_similar_movies_not_found(patch_plex_extended):
         await get_similar_movies("999")
 
 
+# --- Tests for get_similar_artists ---
+
+@pytest.mark.asyncio
+async def test_get_similar_artists_none(patch_plex_extended):
+    """Test get_similar_artists returns message when no similar artists exist."""
+    artist = DummyArtist(1, "Lone Artist")
+    artist.similar = []
+    patch_plex_extended(artists=[artist])
+    result = await get_similar_artists("1")
+    assert "No similar artists found" in result
+
+
+@pytest.mark.asyncio
+async def test_get_similar_artists_found(patch_plex_extended):
+    """Test get_similar_artists returns related artists."""
+    artist = DummyArtist(1, "Base Artist")
+    artist.similar = [DummyGenre("Similar Artist A"), DummyGenre("Similar Artist B")]
+    patch_plex_extended(artists=[artist])
+    result = await get_similar_artists("1")
+    assert "Similar Artist A" in result
+    assert "Similar Artist B" in result
+
+
+@pytest.mark.asyncio
+async def test_get_similar_artists_not_found(patch_plex_extended):
+    """Test get_similar_artists raises error when artist key not found."""
+    from plex_mcp.plex_mcp import PlexMCPNotFoundError
+    patch_plex_extended(artists=[])
+    with pytest.raises(PlexMCPNotFoundError):
+        await get_similar_artists("999")
+
+
 # --- Tests for search_music ---
 
 @pytest.mark.asyncio
@@ -1030,7 +1111,7 @@ async def test_get_artist_details_not_found(patch_plex_extended):
 
 @pytest.mark.asyncio
 async def test_get_album_details_found(patch_plex_extended):
-    """Test get_album_details returns album info and track listing."""
+    """Test get_album_details returns album info and track listing with keys."""
     album = DummyAlbum(1, "Abbey Road", parent_title="The Beatles", year=1969, leaf_count=5)
     patch_plex_extended(albums=[album])
     result = await get_album_details("1")
@@ -1038,6 +1119,7 @@ async def test_get_album_details_found(patch_plex_extended):
     assert "The Beatles" in result
     assert "1969" in result
     assert "Track 1" in result
+    assert "[key:" in result
 
 
 @pytest.mark.asyncio

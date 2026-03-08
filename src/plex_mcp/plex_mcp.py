@@ -15,7 +15,7 @@ import asyncio
 import logging
 
 from plexapi.server import PlexServer
-from plexapi.exceptions import NotFound, Unauthorized
+from plexapi.exceptions import BadRequest, NotFound, Unauthorized
 from mcp.server.fastmcp import FastMCP
 
 # --- Logging Setup ---
@@ -449,10 +449,21 @@ async def get_playlist_items(playlist_key: str) -> str:
 
         formatted_items = []
         for i, item in enumerate(items, 1):
-            title = item.title
-            year = getattr(item, 'year', '')
-            type_str = item.type.capitalize()
-            formatted_items.append(f"{i}. {title} ({year}) - {type_str}")
+            item_type = getattr(item, 'type', 'unknown')
+            if item_type == 'track':
+                artist = getattr(item, 'grandparentTitle', 'Unknown Artist')
+                album = getattr(item, 'parentTitle', 'Unknown Album')
+                duration_s = (getattr(item, 'duration', 0) or 0) // 1000
+                dur_str = f"{duration_s//60}:{duration_s%60:02d}"
+                formatted_items.append(f"{i}. {item.title}  —  {artist} / {album}  ({dur_str})  [key: {item.ratingKey}]")
+            elif item_type == 'episode':
+                show = getattr(item, 'grandparentTitle', '')
+                season = getattr(item, 'parentTitle', '')
+                formatted_items.append(f"{i}. {show} — {season}: {item.title}  [key: {item.ratingKey}]")
+            else:
+                year = getattr(item, 'year', '')
+                year_str = f" ({year})" if year else ""
+                formatted_items.append(f"{i}. {item.title}{year_str}  [key: {item.ratingKey}]")
         return "\n".join(formatted_items)
     except PlexMCPConnectionError:
         raise
@@ -465,54 +476,64 @@ async def get_playlist_items(playlist_key: str) -> str:
         raise PlexMCPError("Failed to fetch playlist items.") from e
 
 @mcp.tool()
-async def create_playlist(name: str, movie_keys: str) -> str:
+async def create_playlist(name: str, item_keys: str) -> str:
     """
-    Create a new playlist with specified movies.
-    
+    Create a new playlist with specified media items.
+
+    Works with any Plex media type: movies, tracks, episodes, etc.
+    Use get_album_details() to find individual track keys for music playlists.
+
     Parameters:
         name: The desired name for the new playlist.
-        movie_keys: A comma-separated string of movie keys to include.
-        
+        item_keys: A comma-separated string of rating keys to include (movies, tracks, episodes).
+
     Returns:
         A success message with playlist details.
 
     Raises:
         PlexMCPError: On invalid input or unexpected failures.
-        PlexMCPNotFoundError: When one or more movie keys are not found.
+        PlexMCPNotFoundError: When one or more item keys are not found.
     """
     try:
         plex = await get_plex_server()
-        movie_key_list = [int(key.strip()) for key in movie_keys.split(",") if key.strip()]
-        if not movie_key_list:
-            raise PlexMCPError("No valid movie keys provided.")
-        if len(movie_key_list) > MAX_KEYS:
-            raise PlexMCPError(f"Too many movie keys. Max allowed is {MAX_KEYS}.")
+        key_list = [int(key.strip()) for key in item_keys.split(",") if key.strip()]
+        if not key_list:
+            raise PlexMCPError("No valid item keys provided.")
+        if len(key_list) > MAX_KEYS:
+            raise PlexMCPError(f"Too many item keys. Max allowed is {MAX_KEYS}.")
 
-        logger.info("Creating playlist '%s' with movie keys: %s", name, movie_keys)
-        movies = []
+        logger.info("Creating playlist '%s' with item keys: %s", name, item_keys)
+        items = []
         not_found_keys = []
 
-        for key in movie_key_list:
+        for key in key_list:
             try:
-                movie = await asyncio.to_thread(plex.fetchItem, key)
-                movies.append(movie)
-                logger.info("Found movie: %s (Key: %d)", movie.title, key)
+                item = await asyncio.to_thread(plex.fetchItem, key)
+                items.append(item)
+                logger.info("Found item: %s (Key: %d)", item.title, key)
             except NotFound:
                 not_found_keys.append(key)
-                logger.warning("Could not find movie with key: %d", key)
+                logger.warning("Could not find item with key: %d", key)
 
         if not_found_keys:
-            raise PlexMCPNotFoundError(f"Some movie keys were not found: {', '.join(str(k) for k in not_found_keys)}")
-        if not movies:
-            raise PlexMCPError("No valid movies found with the provided keys.")
+            raise PlexMCPNotFoundError(f"Some item keys were not found: {', '.join(str(k) for k in not_found_keys)}")
+        if not items:
+            raise PlexMCPError("No valid items found with the provided keys.")
+
+        list_types = {getattr(item, 'listType', None) for item in items}
+        if len(list_types) > 1:
+            raise PlexMCPError(
+                "Cannot mix media types in a playlist. "
+                "All items must be the same type (all video or all audio)."
+            )
 
         try:
             playlist = await asyncio.wait_for(
-                asyncio.to_thread(lambda: plex.createPlaylist(name, items=movies)),
+                asyncio.to_thread(lambda: plex.createPlaylist(name, items=items)),
                 timeout=15.0,
             )
             logger.info("Playlist created successfully: %s", playlist.title)
-            return f"Successfully created playlist '{name}' with {len(movies)} movie(s).\nPlaylist Key: {playlist.ratingKey}"
+            return f"Successfully created playlist '{name}' with {len(items)} item(s).\nPlaylist Key: {playlist.ratingKey}"
         except asyncio.TimeoutError:
             logger.warning("Playlist creation is taking longer than expected for '%s'", name)
             return ("PENDING: Playlist creation is taking longer than expected. "
@@ -523,8 +544,8 @@ async def create_playlist(name: str, movie_keys: str) -> str:
     except PlexMCPError:
         raise
     except ValueError as e:
-        logger.error("Invalid input format for movie keys: %s", e)
-        raise PlexMCPError(f"Invalid input format. Please check movie keys are valid numbers. {str(e)}") from e
+        logger.error("Invalid input format for item keys: %s", e)
+        raise PlexMCPError(f"Invalid input format. Please check item keys are valid numbers. {str(e)}") from e
     except Exception as e:
         logger.exception("Error creating playlist")
         raise PlexMCPError("Failed to create playlist.") from e
@@ -568,25 +589,28 @@ async def delete_playlist(playlist_key: str) -> str:
         raise PlexMCPError("Failed to delete playlist.") from e
 
 @mcp.tool()
-async def add_to_playlist(playlist_key: str, movie_key: str) -> str:
+async def add_to_playlist(playlist_key: str, item_key: str) -> str:
     """
-    Add a movie to an existing playlist.
-    
+    Add a media item to an existing playlist.
+
+    Works with any Plex media type: movies, tracks, episodes, etc.
+    Use get_album_details() to find individual track keys for adding music tracks.
+
     Parameters:
         playlist_key: The key of the playlist.
-        movie_key: The key of the movie to add.
-        
+        item_key: The rating key of the item to add (movie, track, episode, etc.).
+
     Returns:
-        A success message if the movie is added.
+        A success message if the item is added.
 
     Raises:
         PlexMCPError: On invalid input or unexpected failures.
-        PlexMCPNotFoundError: When the playlist or movie is not found.
+        PlexMCPNotFoundError: When the playlist or item is not found.
     """
     try:
         plex = await get_plex_server()
         p_key = int(playlist_key)
-        m_key = int(movie_key)
+        i_key = int(item_key)
 
         # Find the playlist
         try:
@@ -598,23 +622,31 @@ async def add_to_playlist(playlist_key: str, movie_key: str) -> str:
                 raise PlexMCPNotFoundError(f"No playlist found with key {playlist_key}.")
 
         try:
-            movie = await asyncio.to_thread(plex.fetchItem, m_key)
+            item = await asyncio.to_thread(plex.fetchItem, i_key)
         except NotFound:
-            raise PlexMCPNotFoundError(f"No movie found with key {movie_key}.")
+            raise PlexMCPNotFoundError(f"No item found with key {item_key}.")
 
-        # Add the movie to the playlist
-        await asyncio.to_thread(lambda p=playlist, m=movie: p.addItems([m]))
-        logger.info("Added movie '%s' to playlist '%s'", movie.title, playlist.title)
-        return f"Successfully added '{movie.title}' to playlist '{playlist.title}'."
+        playlist_type = getattr(playlist, 'playlistType', None)
+        item_list_type = getattr(item, 'listType', None)
+        type_map = {"audio": "audio", "video": "video"}
+        if playlist_type and item_list_type and type_map.get(item_list_type) != playlist_type:
+            raise PlexMCPError(
+                f"Cannot add a {item_list_type} item to a {playlist_type} playlist. "
+                "Plex playlists cannot mix media types."
+            )
+
+        await asyncio.to_thread(lambda p=playlist, m=item: p.addItems([m]))
+        logger.info("Added '%s' to playlist '%s'", item.title, playlist.title)
+        return f"Successfully added '{item.title}' to playlist '{playlist.title}'."
     except PlexMCPConnectionError:
         raise
     except PlexMCPError:
         raise
     except ValueError:
-        raise PlexMCPError("Invalid playlist or movie key. Please provide valid numbers.")
+        raise PlexMCPError("Invalid playlist or item key. Please provide valid numbers.")
     except Exception as e:
-        logger.exception("Failed to add movie to playlist")
-        raise PlexMCPError("Failed to add movie to playlist.") from e
+        logger.exception("Failed to add item to playlist")
+        raise PlexMCPError("Failed to add item to playlist.") from e
 
 @mcp.tool()
 async def recent_movies(count: int = DEFAULT_LIMIT) -> str:
@@ -1050,6 +1082,42 @@ async def get_similar_movies(movie_key: str, limit: int = DEFAULT_LIMIT) -> str:
 
 
 @mcp.tool()
+async def get_similar_artists(artist_key: str, limit: int = DEFAULT_LIMIT) -> str:
+    """
+    Get artists similar to a given artist based on Plex recommendations.
+
+    Parameters:
+        artist_key: The rating key of the artist.
+        limit: Max number of similar artists to return (default: 5).
+
+    Returns:
+        A formatted list of similar artists.
+    """
+    try:
+        plex = await get_plex_server()
+        key = int(artist_key)
+        artist = await asyncio.to_thread(plex.fetchItem, key)
+        related = await asyncio.to_thread(lambda: artist.similar)
+
+        if not related:
+            return f"No similar artists found for '{artist.title}'."
+
+        results = [f"Artists similar to '{artist.title}':\n"]
+        limit = clamp_int(limit, default=DEFAULT_LIMIT, minimum=1, maximum=MAX_LIMIT)
+        for i, a in enumerate(related[:limit], 1):
+            results.append(f"{i}. {a.tag}")
+
+        return "\n".join(results)
+    except PlexMCPConnectionError:
+        raise
+    except NotFound:
+        raise PlexMCPNotFoundError(f"Artist with key {artist_key} not found.")
+    except Exception as e:
+        logger.exception("Failed to fetch similar artists for key '%s'", artist_key)
+        raise PlexMCPError("Failed to fetch similar artists.") from e
+
+
+@mcp.tool()
 async def search_music(
     artist: Optional[str] = None,
     album: Optional[str] = None,
@@ -1204,7 +1272,7 @@ async def get_album_details(album_key: str) -> str:
         for track in tracks:
             duration_s = (getattr(track, 'duration', 0) or 0) // 1000
             track_num = getattr(track, 'trackNumber', '?')
-            lines.append(f"  {track_num}. {track.title}  ({duration_s//60}:{duration_s%60:02d})")
+            lines.append(f"  {track_num}. {track.title}  ({duration_s//60}:{duration_s%60:02d})  [key: {track.ratingKey}]")
 
         return "\n".join(lines)
     except PlexMCPConnectionError:
