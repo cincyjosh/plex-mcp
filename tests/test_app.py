@@ -228,8 +228,8 @@ async def test_search_movies_not_found(monkeypatch, patch_get_plex_server):
 
 @pytest.mark.asyncio
 async def test_search_movies_exception(monkeypatch):
-    """Test that search_movies returns an error message when an exception occurs."""
-    # Mock the section search to raise an exception
+    """Test that search_movies raises PlexMCPError when an exception occurs."""
+    from plex_mcp.plex_mcp import PlexMCPError
     dummy_server = DummyPlexServer([DummyMovie(1, "Test Movie")])
     dummy_server.library._section.search = MagicMock(side_effect=Exception("Search error"))
 
@@ -238,10 +238,8 @@ async def test_search_movies_exception(monkeypatch):
 
     monkeypatch.setattr("plex_mcp.plex_mcp.get_plex_server", mock_get_plex_server)
 
-    result = await search_movies(title="Test")
-
-    assert "ERROR: Could not search Plex" in result
-    assert "Search error" in result
+    with pytest.raises(PlexMCPError):
+        await search_movies(title="Test")
 
 @pytest.mark.asyncio
 async def test_search_movies_empty_string(patch_get_plex_server):

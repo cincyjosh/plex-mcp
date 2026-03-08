@@ -65,12 +65,6 @@ def clamp_int(value: Optional[int], default: int, minimum: int, maximum: int) ->
         return default
     return clamp(value, minimum, maximum)
 
-def user_error(message: str) -> str:
-    """
-    Return a user-safe error message while logging the full exception elsewhere.
-    """
-    return f"ERROR: {message}"
-
 def format_movie(movie) -> str:
     """
     Format a movie object into a human-readable string.
@@ -342,7 +336,7 @@ async def search_movies(
         raise
     except Exception as e:
         logger.exception("search_movies failed")
-        return user_error(f"Could not search Plex. {e}")
+        raise PlexMCPError("Failed to search movies.") from e
 
     if not movies:
         return f"No movies found matching filters {filters!r}."

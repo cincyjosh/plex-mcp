@@ -191,8 +191,8 @@ If you are experiencing connection issues to your Plex server try running the in
 - **Documentation & Comments:**  
   Include a concise docstring for every module, class, and function, with in-line comments for complex logic.
 
-- **Error Handling & Logging:**  
-  Use Python’s `logging` module with consistent error messages (prefix “ERROR:”) and explicit exception handling.
+- **Error Handling & Logging:**
+  Use Python’s `logging` module with descriptive error messages and explicit exception handling. Raise `PlexMCPError` (or a subclass) for tool errors rather than returning error strings.
 
 - **Asynchronous Patterns:**  
   Define I/O-bound functions as async and use `asyncio.to_thread()` to handle blocking operations.
