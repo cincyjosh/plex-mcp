@@ -678,11 +678,11 @@ class DummyPlexServerExtended(DummyPlexServer):
             raise NotFound(f"No item with key {key}")
         return item
 
-    myPlexUsername = "testuser"
+    def myPlexAccount(self):
+        return type("PlexAccount", (), {"username": "testuser"})()
 
     def systemAccounts(self):
-        account = type("Account", (), {"id": 1, "name": "testuser"})()
-        return [account]
+        return [type("Account", (), {"id": 1, "name": "testuser"})()]
 
     def history(self, maxresults=None, accountID=None):
         return self._history[:maxresults] if maxresults else self._history

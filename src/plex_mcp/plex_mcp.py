@@ -755,10 +755,12 @@ async def get_watch_history(count: int = 10) -> str:
         plex = await get_plex_server()
         # Resolve the account ID for the token owner so history is scoped to
         # the authenticated user, not all shared accounts on the server.
+        # myPlexUsername returns the email; myPlexAccount().username returns
+        # the username that matches the systemAccounts name field.
+        my_account = await asyncio.to_thread(lambda: plex.myPlexAccount())
         system_accounts = await asyncio.to_thread(lambda: plex.systemAccounts())
-        my_username = plex.myPlexUsername
         account_id = next(
-            (a.id for a in system_accounts if a.name == my_username), None
+            (a.id for a in system_accounts if a.name == my_account.username), None
         )
         history = await asyncio.to_thread(
             lambda: plex.history(maxresults=count, accountID=account_id)
