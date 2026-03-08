@@ -9,3 +9,11 @@ wheels/
 
 # Virtual environments
 .venv
+
+#AI Files
+.ai/
+.aider/
+.cursor/
+.claude/
+.gemini/
+.codeium/

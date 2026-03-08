@@ -1,8 +1,8 @@
 # Plex MCP Server
 
-[![smithery badge](https://smithery.ai/badge/@djbriane/plex-mcp)](https://smithery.ai/server/@djbriane/plex-mcp)
+This is a Python-based MCP server that integrates with the Plex Media Server API to search and browse movies, TV shows, and music, manage playlists, and explore watch history. It uses the PlexAPI library for seamless interaction with your Plex server.
 
-This is a Python-based MCP server that integrates with the Plex Media Server API to search for movies and manage playlists. It uses the PlexAPI library for seamless interaction with your Plex server.
+> Based on the original project by [@djbriane](https://github.com/djbriane/plex-mcp). Credit and thanks for the foundation this work builds on.
 
 ## Screenshots
 
@@ -32,19 +32,11 @@ Create a new playlist in your Plex library using the movies found in a search. T
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.13 or higher
 - `uv` package manager
 - A Plex Media Server with API access
 
 ### Installation
-
-### Installing via Smithery
-
-To install Plex Media Server Integration for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@djbriane/plex-mcp):
-
-```bash
-npx -y @smithery/cli install @djbriane/plex-mcp --client claude
-```
 
 ### Installing Manually
 1. Clone this repository:
@@ -66,14 +58,14 @@ npx -y @smithery/cli install @djbriane/plex-mcp --client claude
 
 ### Finding Your Plex Token
 
-You can find your Plex token in this way:
-
-   - Sign in to Plex Web App
-   - Open Developer Tools
-   - In Console tab, paste and run:
-     ```javascript
-     window.localStorage.getItem('myPlexAccessToken')
-     ```
+1. Sign in to [plex.tv](https://plex.tv) in your browser
+2. Open Developer Tools (`F12` or `Cmd+Option+I` on Mac)
+3. Go to the **Console** tab
+4. Paste and run:
+   ```javascript
+   window.localStorage.getItem('myPlexAccessToken')
+   ```
+5. The token appears as output — it looks like `xxxxxxxxxxxxxxxxxxxx`
 
 ## Usage with Claude
 
@@ -101,22 +93,66 @@ Add the following configuration to your Claude app:
 
 ## Available Commands
 
-The Plex MCP server exposes these commands:
-| Command              | Description                                                                 | OpenAPI Reference                     |
-|----------------------|-----------------------------------------------------------------------------|---------------------------------------|
-| `search_movies`      | Search for movies in your library by various filters (e.g., title, director, genre) with support for a `limit` parameter to control the number of results. | `/library/sections/{sectionKey}/search` |
-| `get_movie_details`  | Get detailed information about a specific movie.                           | `/library/metadata/{ratingKey}`       |
-| `get_movie_genres`   | Get the genres for a specific movie.                                       | `/library/sections/{sectionKey}/genre` |
-| `list_playlists`     | List all playlists on your Plex server.                                    | `/playlists`                          |
-| `get_playlist_items` | Get the items in a specific playlist.                                      | `/playlists/{playlistID}/items`       |
-| `create_playlist`    | Create a new playlist with specified movies.                              | `/playlists`                          |
-| `delete_playlist`    | Delete a playlist from your Plex server.                                  | `/playlists/{playlistID}`             |
-| `add_to_playlist`    | Add a movie to an existing playlist.                                       | `/playlists/{playlistID}/items`       |
-| `recent_movies`      | Get recently added movies from your library.                              | `/library/recentlyAdded`              |
+### Movies
+
+| Command               | Description                                                                 |
+|-----------------------|-----------------------------------------------------------------------------|
+| `search_movies`       | Search by title, director, genre, actor, studio, year, rating, country, language, watched status, and duration. |
+| `get_movie_details`   | Get detailed information about a specific movie by key.                    |
+| `get_movie_genres`    | Get the genres for a specific movie.                                       |
+| `recent_movies`       | Get recently added movies from your library.                               |
+| `most_watched`        | Get the most watched movies or TV shows sorted by play count. Use `media_type="movies"` or `media_type="shows"`. |
+| `get_similar_movies`  | Get Plex-recommended movies similar to a given movie.                      |
+
+### TV Shows
+
+| Command            | Description                                                                 |
+|--------------------|-----------------------------------------------------------------------------|
+| `search_tv_shows`  | Search for TV shows by title, genre, actor, studio, year, or watched status. |
+| `get_show_details` | Get show info, genres, cast, and a full season/episode breakdown.          |
+
+### Music
+
+| Command              | Description                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| `search_music`       | Search for artists, albums, or tracks by name or genre.                    |
+| `get_artist_details` | Get artist info and a full list of their albums.                           |
+| `get_album_details`  | Get album info and full track listing with durations.                      |
+
+### Playlists
+
+| Command              | Description                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| `list_playlists`     | List all playlists on your Plex server.                                    |
+| `get_playlist_items` | Get the items in a specific playlist.                                      |
+| `create_playlist`    | Create a new playlist with specified movies.                               |
+| `delete_playlist`    | Delete a playlist from your Plex server.                                   |
+| `add_to_playlist`    | Add a movie to an existing playlist.                                       |
+
+### Watch Activity
+
+| Command              | Description                                                                 |
+|----------------------|-----------------------------------------------------------------------------|
+| `get_watch_history`  | Get recently played items across all libraries.                            |
+| `get_on_deck`        | Get in-progress media with percentage completion.                          |
+| `get_library_stats`  | Get item counts, total runtime, and storage size per library section.      |
+
+## Operational Notes
+
+- Result limits are capped to prevent accidental heavy queries (`limit`/`count` max is 50, `create_playlist` accepts up to 100 movie keys).
+- `get_library_stats` scans up to 5,000 episodes/tracks per library section to calculate runtime and storage. Libraries exceeding this cap will show a `(capped at 5000)` note next to the count; item counts for top-level shows/artists are always exact.
+- The Plex connection is cached and automatically re-established if it goes stale (e.g. after a server restart). Invalid tokens surface immediately without retrying.
+- Tools raise `PlexMCPError`/`PlexMCPNotFoundError` for invalid inputs or missing items; MCP clients will surface these as tool errors rather than `"ERROR: ..."` strings.
 
 ## Running Tests
 
-This project includes both unit tests and integration tests. Use the following instructions to run each type of test:
+This project includes both unit tests and integration tests. Use the following instructions to run each type of test.
+
+Test dependencies (`pytest`, `pytest-asyncio`) are in the `dev` dependency group. `uv sync` installs them automatically; if you're managing the environment manually, run:
+
+```bash
+uv sync --group dev
+```
 
 ### Unit Tests
 
@@ -160,4 +196,3 @@ If you are experiencing connection issues to your Plex server try running the in
 
 - **Asynchronous Patterns:**  
   Define I/O-bound functions as async and use `asyncio.to_thread()` to handle blocking operations.
-
