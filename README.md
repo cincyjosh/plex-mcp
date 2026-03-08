@@ -4,29 +4,74 @@ This is a Python-based MCP server that integrates with the Plex Media Server API
 
 > Based on the original project by [@djbriane](https://github.com/djbriane/plex-mcp). Credit and thanks for the foundation this work builds on.
 
-## Screenshots
+## Examples
 
-Here are some examples of how the Plex MCP server works:
+Here are some examples of things you can ask Claude using this MCP server:
 
-### 1. Find Movies in Plex Library by Director
-Search for movies in your Plex library by specifying a director's name. For example, searching for "Alfred Hitchcock" returns a list of his movies in your library.
+### Movies
 
-![Find movies by director](images/plex-mcp-search-movies-hitchcock.png)
+**Search by director**
+> "Show me all Christopher Nolan movies in my library"
+
+**Search by rating and genre**
+> "Find R-rated action movies over 2 hours long"
+
+**Find something to watch**
+> "Recommend me an unwatched drama from the 90s"
+
+**Similar movies**
+> "What movies are similar to Interstellar?"
+
+**Recently added**
+> "What movies were added to my library recently?"
+
+**Most watched**
+> "What are my most watched movies?"
 
 ---
 
-### 2. Find Missing Movies for a Director
-Identify movies by a specific director that are missing from your Plex library. This helps you discover gaps in your collection.
+### TV Shows
 
-![Find missing movies](images/plex-mcp-missing-movies.png)
+**Search shows**
+> "Do I have any sci-fi TV shows in my library?"
+
+**Show details**
+> "How many seasons of Breaking Bad do I have?"
 
 ---
 
-### 3. Create a Playlist in Your Plex Library
-Create a new playlist in your Plex library using the movies found in a search. This allows you to organize your library efficiently.
+### Music
 
-![Create a playlist](images/plex-mcp-create-playlist.png)
+**Find an artist**
+> "What albums do I have by 2Pac?"
 
+**Browse a tracklist**
+> "Show me the tracks on Abbey Road"
+
+---
+
+### Playlists
+
+**Create a playlist**
+> "Create a playlist called 'Date Night' with the Christopher Nolan movies from my library"
+
+**Browse playlists**
+> "What playlists do I have?"
+
+---
+
+### Watch Activity
+
+**History**
+> "What did I watch recently?"
+
+**On deck**
+> "What do I have in progress?"
+
+**Library stats**
+> "How much content is in my Plex library?"
+
+---
 
 ## Setup
 

@@ -753,7 +753,16 @@ async def get_watch_history(count: int = 10) -> str:
 
     try:
         plex = await get_plex_server()
-        history = await asyncio.to_thread(lambda: plex.history(maxresults=count))
+        # Resolve the account ID for the token owner so history is scoped to
+        # the authenticated user, not all shared accounts on the server.
+        system_accounts = await asyncio.to_thread(lambda: plex.systemAccounts())
+        my_username = plex.myPlexUsername
+        account_id = next(
+            (a.id for a in system_accounts if a.name == my_username), None
+        )
+        history = await asyncio.to_thread(
+            lambda: plex.history(maxresults=count, accountID=account_id)
+        )
         if not history:
             return "No watch history found."
 
