@@ -31,10 +31,67 @@ jobs:
         run: uv venv
 
       - name: Install dependencies with `uv`
-        run: uv pip install -e .
+        run: uv sync --group dev
 
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$(pwd)/src" >> $GITHUB_ENV
 
       - name: Run unit tests with `uv`
         run: uv run pytest
+
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Install `uv`
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dev dependencies
+        run: uv sync --group dev
+
+      - name: Check formatting
+        run: uv run ruff format --check src/
+
+      - name: Lint
+        run: uv run ruff check src/
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Install `uv`
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dev dependencies
+        run: uv sync --group dev
+
+      - name: Run mypy
+        run: uv run mypy src/

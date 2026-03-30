@@ -17,3 +17,6 @@ wheels/
 .claude/
 .gemini/
 .codeium/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md

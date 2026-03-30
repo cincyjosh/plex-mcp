@@ -2,7 +2,6 @@ import asyncio
 import pytest
 from unittest.mock import MagicMock
 from datetime import datetime
-
 # Module: Tests for plex_mcp module
 # This file contains tests for the plex_mcp module functions, including edge cases,
 # large datasets, and error handling.
@@ -32,13 +31,16 @@ from plex_mcp import (
     get_album_details,
 )
 
+
 # --- Set Dummy Environment Variables ---
 @pytest.fixture(autouse=True)
 def set_dummy_env(monkeypatch):
     monkeypatch.setenv("PLEX_SERVER_URL", "http://dummy")
     monkeypatch.setenv("PLEX_TOKEN", "dummy")
 
+
 # --- Dummy Classes to Simulate Plex Objects ---
+
 
 class DummyTag:
     def __init__(self, tag):
@@ -77,15 +79,18 @@ class DummyMovie:
         self.listType = "video"
         self.addedAt = addedAt  # New attribute
 
+
 # Subclass for movies with genres.
 class DummyMovieWithGenres(DummyMovie):
     def __init__(self, ratingKey, title, genres, **kwargs):
         super().__init__(ratingKey, title, **kwargs)
         self.genres = genres
 
+
 class DummyGenre:
     def __init__(self, tag):
         self.tag = tag
+
 
 class DummySection:
     def __init__(self, section_type, title="Movies"):
@@ -101,12 +106,15 @@ class DummySection:
     def recentlyAdded(self, maxresults):
         return []
 
+
 class DummyMovieSection:
     def __init__(self, movies=None):
         self._movies = movies if movies is not None else []
 
     def search(self, title=None, maxresults=None, **kwargs):
-        results = [m for m in self._movies if title is None or title.lower() in m.title.lower()]
+        results = [
+            m for m in self._movies if title is None or title.lower() in m.title.lower()
+        ]
         if maxresults is not None:
             results = results[:maxresults]
         return results
@@ -116,6 +124,7 @@ class DummyMovieSection:
         if maxresults is not None:
             results = results[:maxresults]
         return results
+
 
 class DummyLibrary:
     def __init__(self, movies=None):
@@ -127,7 +136,11 @@ class DummyLibrary:
         if isinstance(title, MovieSearchParams):
             title = title.title  # Unwrap if passed improperly
         if kwargs.get("libtype") == "movie":
-            return [m for m in self._movies if title is None or title.lower() in m.title.lower()]
+            return [
+                m
+                for m in self._movies
+                if title is None or title.lower() in m.title.lower()
+            ]
         return []
 
     def section(self, name):
@@ -135,6 +148,7 @@ class DummyLibrary:
 
     def sections(self):
         return [DummySection("movie")]
+
 
 class DummyPlaylist:
     def __init__(self, ratingKey, title, items):
@@ -152,6 +166,7 @@ class DummyPlaylist:
     def addItems(self, items):
         self._items.extend(items)
 
+
 class DummyPlexServer:
     def __init__(self, movies=None, playlists=None):
         self._movies = movies if movies is not None else []
@@ -160,6 +175,7 @@ class DummyPlexServer:
 
     def fetchItem(self, key):
         from plexapi.exceptions import NotFound
+
         movie = next((m for m in self._movies if m.ratingKey == key), None)
         if movie is None:
             raise NotFound(f"No item with key {key}")
@@ -173,22 +189,28 @@ class DummyPlexServer:
         self._playlists.append(new_playlist)
         return new_playlist
 
+
 # Asynchronous dummy_get_plex_server function.
 async def dummy_get_plex_server(movies=None, playlists=None):
     await asyncio.sleep(0)
     return DummyPlexServer(movies, playlists)
 
+
 # --- Fixtures ---
+
 
 @pytest.fixture
 def patch_get_plex_server(monkeypatch):
     """Fixture to patch the get_plex_server function with a dummy Plex server."""
+
     def _patch(movies=None, playlists=None):
         monkeypatch.setattr(
             "plex_mcp.plex_mcp.get_plex_server",
-            lambda: dummy_get_plex_server(movies, playlists)
+            lambda: dummy_get_plex_server(movies, playlists),
         )
+
     return _patch
+
 
 @pytest.fixture
 def dummy_movie():
@@ -198,10 +220,12 @@ def dummy_movie():
         year=2022,
         directors=["Jane Doe"],
         roles=["Test Actor"],
-        genres=["Thriller"]
+        genres=["Thriller"],
     )
 
+
 # --- Tests for search_movies ---
+
 
 @pytest.mark.asyncio
 async def test_search_movies_found(patch_get_plex_server, dummy_movie):
@@ -210,6 +234,7 @@ async def test_search_movies_found(patch_get_plex_server, dummy_movie):
     result = await search_movies(title="Test")
     assert "Test Movie" in result
     assert "more results" not in result
+
 
 @pytest.mark.asyncio
 async def test_search_movies_multiple_results(patch_get_plex_server):
@@ -221,6 +246,7 @@ async def test_search_movies_multiple_results(patch_get_plex_server):
         assert f"Test Movie {i}" in result
     assert "more results exist" in result
 
+
 @pytest.mark.asyncio
 async def test_search_movies_not_found(monkeypatch, patch_get_plex_server):
     """Test that search_movies returns a 'not found' message when no movies match the query."""
@@ -228,12 +254,16 @@ async def test_search_movies_not_found(monkeypatch, patch_get_plex_server):
     result = await search_movies(title="NonExisting")
     assert "No movies found" in result
 
+
 @pytest.mark.asyncio
 async def test_search_movies_exception(monkeypatch):
     """Test that search_movies raises PlexMCPError when an exception occurs."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     dummy_server = DummyPlexServer([DummyMovie(1, "Test Movie")])
-    dummy_server.library._section.search = MagicMock(side_effect=Exception("Search error"))
+    dummy_server.library._section.search = MagicMock(
+        side_effect=Exception("Search error")
+    )
 
     async def mock_get_plex_server():
         return dummy_server
@@ -243,6 +273,7 @@ async def test_search_movies_exception(monkeypatch):
     with pytest.raises(PlexMCPError):
         await search_movies(title="Test")
 
+
 @pytest.mark.asyncio
 async def test_search_movies_empty_string(patch_get_plex_server):
     """Test search_movies with an empty string returns the not-found message."""
@@ -250,12 +281,14 @@ async def test_search_movies_empty_string(patch_get_plex_server):
     result = await search_movies(title="")
     assert result.startswith("No movies found")
 
+
 @pytest.mark.asyncio
 async def test_search_movies_none_input(patch_get_plex_server, dummy_movie):
     """Test that search_movies with None input returns results (treated as unfiltered search)."""
     patch_get_plex_server([dummy_movie])
     result = await search_movies()
     assert "Test Movie" in result
+
 
 @pytest.mark.asyncio
 async def test_search_movies_large_dataset(patch_get_plex_server):
@@ -266,6 +299,7 @@ async def test_search_movies_large_dataset(patch_get_plex_server):
     for i in range(1, 6):
         assert f"Test Movie {i}" in result
     assert "more results exist" in result
+
 
 @pytest.mark.asyncio
 async def test_search_movies_with_default_limit(patch_get_plex_server):
@@ -278,6 +312,7 @@ async def test_search_movies_with_default_limit(patch_get_plex_server):
     assert "Result #5" in result
     assert "more results exist" in result
     assert "Result #6" not in result  # Ensure only 5 results are shown
+
 
 @pytest.mark.asyncio
 async def test_search_movies_with_custom_limit(patch_get_plex_server):
@@ -292,6 +327,7 @@ async def test_search_movies_with_custom_limit(patch_get_plex_server):
     assert "more results exist" in result
     assert "Result #9" not in result  # Ensure only 8 results are shown
 
+
 @pytest.mark.asyncio
 async def test_search_movies_with_limit_exceeding_results(patch_get_plex_server):
     """Test that search_movies handles a limit larger than the number of results."""
@@ -301,8 +337,11 @@ async def test_search_movies_with_limit_exceeding_results(patch_get_plex_server)
     result = await search_movies(title="Test", limit=10)
     assert "Result #1" in result
     assert "Result #3" in result
-    assert "more results exist" not in result  # Ensure no "more results" message is shown
+    assert (
+        "more results exist" not in result
+    )  # Ensure no "more results" message is shown
     assert "Result #4" not in result  # Ensure no extra results are shown
+
 
 @pytest.mark.asyncio
 async def test_search_movies_with_invalid_limit(patch_get_plex_server):
@@ -316,6 +355,7 @@ async def test_search_movies_with_invalid_limit(patch_get_plex_server):
     assert "Result #2" not in result
     assert "more results exist" in result
 
+
 @pytest.mark.asyncio
 async def test_search_movies_no_results(patch_get_plex_server):
     """Test that search_movies returns an appropriate message when no results are found."""
@@ -324,7 +364,9 @@ async def test_search_movies_no_results(patch_get_plex_server):
     result = await search_movies(title="Nonexistent")
     assert "No movies found" in result
 
+
 # --- Tests for get_movie_details ---
+
 
 @pytest.mark.asyncio
 async def test_get_movie_details_valid(patch_get_plex_server, dummy_movie):
@@ -334,24 +376,30 @@ async def test_get_movie_details_valid(patch_get_plex_server, dummy_movie):
     assert "Test Movie" in result
     assert "2022" in result
 
+
 @pytest.mark.asyncio
 async def test_get_movie_details_invalid_key(patch_get_plex_server, dummy_movie):
     """Test that get_movie_details returns an error for a non-numeric movie key."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     patch_get_plex_server([dummy_movie])
     with pytest.raises(PlexMCPError):
         await get_movie_details("invalid")
+
 
 @pytest.mark.asyncio
 async def test_get_movie_details_not_found(patch_get_plex_server):
     """Test that get_movie_details returns a 'not found' message when the movie is missing."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_get_plex_server([])
 
     with pytest.raises(PlexMCPNotFoundError):
         await get_movie_details("1")
 
+
 # --- Tests for list_playlists ---
+
 
 @pytest.mark.asyncio
 async def test_list_playlists_empty(patch_get_plex_server):
@@ -360,6 +408,7 @@ async def test_list_playlists_empty(patch_get_plex_server):
 
     result = await list_playlists()
     assert "No playlists found" in result
+
 
 @pytest.mark.asyncio
 async def test_list_playlists_found(patch_get_plex_server, dummy_movie):
@@ -371,7 +420,9 @@ async def test_list_playlists_found(patch_get_plex_server, dummy_movie):
     assert "My Playlist" in result
     assert "Playlist #1" in result
 
+
 # --- Tests for get_playlist_items ---
+
 
 @pytest.mark.asyncio
 async def test_get_playlist_items_found(patch_get_plex_server, dummy_movie):
@@ -382,24 +433,33 @@ async def test_get_playlist_items_found(patch_get_plex_server, dummy_movie):
     result = await get_playlist_items("2")
     assert "Test Movie" in result
 
+
 @pytest.mark.asyncio
 async def test_get_playlist_items_not_found(patch_get_plex_server):
     """Test that get_playlist_items returns an error when the playlist is not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_get_plex_server(playlists=[])
 
     with pytest.raises(PlexMCPNotFoundError):
         await get_playlist_items("99")
 
+
 @pytest.mark.asyncio
 async def test_get_playlist_items_with_track(patch_plex_extended):
     """Test that get_playlist_items formats track items with artist, album, duration, and key."""
-    track = DummyTrack(42, "Come Together", duration_ms=259000, track_number=1,
-                       parent_title="Abbey Road", grandparent_title="The Beatles")
+    track = DummyTrack(
+        42,
+        "Come Together",
+        duration_ms=259000,
+        track_number=1,
+        parent_title="Abbey Road",
+        grandparent_title="The Beatles",
+    )
     dummy_playlist = DummyPlaylist(2, "My Music", [track])
     patch_plex_extended(tracks=[track])
     # Manually wire the playlist into patch_plex_extended via extended server
-    from unittest.mock import AsyncMock, MagicMock, patch as mock_patch
+    from unittest.mock import MagicMock, patch as mock_patch
     from plex_mcp import plex_mcp as module
 
     dummy_server = MagicMock()
@@ -417,7 +477,9 @@ async def test_get_playlist_items_with_track(patch_plex_extended):
     assert "Abbey Road" in result
     assert "[key: 42]" in result
 
+
 # --- Tests for create_playlist ---
+
 
 @pytest.mark.asyncio
 async def test_create_playlist_success(patch_get_plex_server, dummy_movie):
@@ -427,25 +489,33 @@ async def test_create_playlist_success(patch_get_plex_server, dummy_movie):
     result = await create_playlist("My Playlist", "1")
     assert "Successfully created playlist 'My Playlist'" in result
 
+
 @pytest.mark.asyncio
 async def test_create_playlist_with_tracks(patch_plex_extended):
     """Test that create_playlist works with individual track keys."""
-    track1 = DummyTrack(101, "Come Together", parent_title="Abbey Road", grandparent_title="The Beatles")
-    track2 = DummyTrack(102, "Something", parent_title="Abbey Road", grandparent_title="The Beatles")
+    track1 = DummyTrack(
+        101, "Come Together", parent_title="Abbey Road", grandparent_title="The Beatles"
+    )
+    track2 = DummyTrack(
+        102, "Something", parent_title="Abbey Road", grandparent_title="The Beatles"
+    )
     patch_plex_extended(tracks=[track1, track2])
     result = await create_playlist("Beatles Mix", "101,102")
     assert "Successfully created playlist 'Beatles Mix'" in result
     assert "2 item(s)" in result
 
+
 @pytest.mark.asyncio
 async def test_create_playlist_mixed_types_rejected(patch_plex_extended):
     """Test that create_playlist rejects mixed audio/video items."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     movie = DummyMovie(1, "Some Movie")
     track = DummyTrack(101, "Some Track")
     patch_plex_extended(movies=[movie], tracks=[track])
     with pytest.raises(PlexMCPError, match="Cannot mix media types"):
         await create_playlist("Bad Mix", "1,101")
+
 
 @pytest.mark.asyncio
 async def test_create_playlist_unknown_list_type_allowed(patch_plex_extended):
@@ -456,16 +526,20 @@ async def test_create_playlist_unknown_list_type_allowed(patch_plex_extended):
     result = await create_playlist("Uncertain Mix", "1")
     assert "Successfully created playlist" in result
 
+
 @pytest.mark.asyncio
 async def test_create_playlist_no_valid_items(patch_get_plex_server):
     """Test that create_playlist returns an error when no valid item keys are found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_get_plex_server([])
 
     with pytest.raises(PlexMCPNotFoundError):
         await create_playlist("My Playlist", "1,2")
 
+
 # --- Tests for delete_playlist ---
+
 
 @pytest.mark.asyncio
 async def test_delete_playlist_success(patch_get_plex_server, dummy_movie):
@@ -476,16 +550,20 @@ async def test_delete_playlist_success(patch_get_plex_server, dummy_movie):
     result = await delete_playlist("3")
     assert "Successfully deleted playlist" in result
 
+
 @pytest.mark.asyncio
 async def test_delete_playlist_not_found(patch_get_plex_server):
     """Test that delete_playlist returns an error when no matching playlist is found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_get_plex_server(playlists=[])
 
     with pytest.raises(PlexMCPNotFoundError):
         await delete_playlist("99")
 
+
 # --- Tests for add_to_playlist ---
+
 
 @pytest.mark.asyncio
 async def test_add_to_playlist_success(patch_get_plex_server):
@@ -497,16 +575,65 @@ async def test_add_to_playlist_success(patch_get_plex_server):
     result = await add_to_playlist("4", "5")
     assert "Successfully added 'Added Movie' to playlist" in result
 
+
 @pytest.mark.asyncio
 async def test_add_to_playlist_playlist_not_found(patch_get_plex_server):
     """Test that add_to_playlist returns an error when the specified playlist is not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_get_plex_server(playlists=[])
 
     with pytest.raises(PlexMCPNotFoundError):
         await add_to_playlist("999", "5")
 
+
+@pytest.mark.asyncio
+async def test_add_to_playlist_item_not_found(patch_get_plex_server):
+    """Test that add_to_playlist raises PlexMCPNotFoundError when the item key doesn't exist."""
+    from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
+    dummy_playlist = DummyPlaylist(4, "My Playlist", [])
+    # No movies in the server — fetchItem for the item key will raise NotFound.
+    patch_get_plex_server([], playlists=[dummy_playlist])
+
+    with pytest.raises(PlexMCPNotFoundError):
+        await add_to_playlist("4", "999")
+
+
+@pytest.mark.asyncio
+async def test_add_to_playlist_invalid_key(patch_get_plex_server):
+    """Test that add_to_playlist raises PlexMCPError when a non-numeric key is given."""
+    from plex_mcp.plex_mcp import PlexMCPError
+
+    patch_get_plex_server([])
+
+    with pytest.raises(PlexMCPError):
+        await add_to_playlist("not-a-number", "5")
+
+
+@pytest.mark.asyncio
+async def test_add_to_playlist_type_mismatch(monkeypatch):
+    """Test that add_to_playlist raises PlexMCPError when item type conflicts with playlist type."""
+    from plex_mcp.plex_mcp import PlexMCPError
+
+    video_playlist = DummyPlaylist(4, "Movie Playlist", [])
+    video_playlist.playlistType = "video"
+
+    # DummyTrack has listType = "audio" — incompatible with a video playlist.
+    track = DummyTrack(10, "A Song")
+    server = DummyPlexServerExtended(tracks=[track], playlists=[video_playlist])
+
+    async def mock_server():
+        return server
+
+    monkeypatch.setattr("plex_mcp.plex_mcp.get_plex_server", mock_server)
+
+    with pytest.raises(PlexMCPError, match="Cannot add"):
+        await add_to_playlist("4", "10")
+
+
 # --- Tests for recent_movies ---
+
 
 @pytest.mark.asyncio
 async def test_recent_movies_found(patch_get_plex_server):
@@ -517,6 +644,7 @@ async def test_recent_movies_found(patch_get_plex_server):
     result = await recent_movies(5)
     assert "Recent Movie" in result
 
+
 @pytest.mark.asyncio
 async def test_recent_movies_not_found(patch_get_plex_server):
     """Test that recent_movies returns an error message when no recent movies are found."""
@@ -525,16 +653,16 @@ async def test_recent_movies_not_found(patch_get_plex_server):
     result = await recent_movies(5)
     assert "No recent movies found" in result
 
+
 # --- Tests for get_movie_genres ---
+
 
 @pytest.mark.asyncio
 async def test_get_movie_genres_found(monkeypatch, patch_get_plex_server):
     """Test that get_movie_genres returns the correct genres for a movie."""
     # Create a dummy movie with genre tags
     movie_with_genres = DummyMovie(
-        rating_key=1,
-        title="Test Movie",
-        genres=["Action", "Thriller"]
+        rating_key=1, title="Test Movie", genres=["Action", "Thriller"]
     )
 
     patch_get_plex_server([movie_with_genres])
@@ -542,10 +670,12 @@ async def test_get_movie_genres_found(monkeypatch, patch_get_plex_server):
     assert "Action" in result
     assert "Thriller" in result
 
+
 @pytest.mark.asyncio
 async def test_get_movie_genres_not_found(patch_get_plex_server):
     """Test that get_movie_genres returns an error message when no matching movie is found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_get_plex_server([])
     with pytest.raises(PlexMCPNotFoundError):
         await get_movie_genres("1")
@@ -553,9 +683,21 @@ async def test_get_movie_genres_not_found(patch_get_plex_server):
 
 # --- Dummy Classes for New Tools ---
 
+
 class DummyShow:
-    def __init__(self, rating_key, title, year=2020, summary="A test show", genres=None,
-                 roles=None, studio="Test Network", rating="TV-MA", child_count=2, leaf_count=20):
+    def __init__(
+        self,
+        rating_key,
+        title,
+        year=2020,
+        summary="A test show",
+        genres=None,
+        roles=None,
+        studio="Test Network",
+        rating="TV-MA",
+        child_count=2,
+        leaf_count=20,
+    ):
         self.ratingKey = rating_key
         self.title = title
         self.year = year
@@ -569,7 +711,9 @@ class DummyShow:
         self.type = "show"
 
     def seasons(self):
-        return [DummySeason(10, f"Season {i}", i, 10) for i in range(1, self.childCount + 1)]
+        return [
+            DummySeason(10, f"Season {i}", i, 10) for i in range(1, self.childCount + 1)
+        ]
 
 
 class DummySeason:
@@ -581,7 +725,9 @@ class DummySeason:
 
 
 class DummyArtist:
-    def __init__(self, rating_key, title, genres=None, summary="An artist", child_count=3):
+    def __init__(
+        self, rating_key, title, genres=None, summary="An artist", child_count=3
+    ):
         self.ratingKey = rating_key
         self.title = title
         self.genres = [DummyTag(g) for g in (genres or ["Rock"])]
@@ -590,12 +736,22 @@ class DummyArtist:
         self.type = "artist"
 
     def albums(self):
-        return [DummyAlbum(20 + i, f"Album {i}", self.title, year=2000 + i) for i in range(1, self.childCount + 1)]
+        return [
+            DummyAlbum(20 + i, f"Album {i}", self.title, year=2000 + i)
+            for i in range(1, self.childCount + 1)
+        ]
 
 
 class DummyTrack:
-    def __init__(self, rating_key, title, duration_ms=240000, track_number=1,
-                 parent_title="Album", grandparent_title="Artist"):
+    def __init__(
+        self,
+        rating_key,
+        title,
+        duration_ms=240000,
+        track_number=1,
+        parent_title="Album",
+        grandparent_title="Artist",
+    ):
         self.ratingKey = rating_key
         self.title = title
         self.duration = duration_ms
@@ -607,8 +763,15 @@ class DummyTrack:
 
 
 class DummyAlbum:
-    def __init__(self, rating_key, title, parent_title="Artist", year=2020,
-                 genres=None, leaf_count=10):
+    def __init__(
+        self,
+        rating_key,
+        title,
+        parent_title="Artist",
+        year=2020,
+        genres=None,
+        leaf_count=10,
+    ):
         self.ratingKey = rating_key
         self.title = title
         self.parentTitle = parent_title
@@ -618,12 +781,27 @@ class DummyAlbum:
         self.type = "album"
 
     def tracks(self):
-        return [DummyTrack(100 + i, f"Track {i}", track_number=i, parent_title=self.title,
-                           grandparent_title=self.parentTitle) for i in range(1, self.leafCount + 1)]
+        return [
+            DummyTrack(
+                100 + i,
+                f"Track {i}",
+                track_number=i,
+                parent_title=self.title,
+                grandparent_title=self.parentTitle,
+            )
+            for i in range(1, self.leafCount + 1)
+        ]
 
 
 class DummyHistoryItem:
-    def __init__(self, rating_key, title, item_type="movie", viewed_at=None, grandparent_title=None):
+    def __init__(
+        self,
+        rating_key,
+        title,
+        item_type="movie",
+        viewed_at=None,
+        grandparent_title=None,
+    ):
         self.ratingKey = rating_key
         self.title = title
         self.type = item_type
@@ -632,8 +810,15 @@ class DummyHistoryItem:
 
 
 class DummyOnDeckItem:
-    def __init__(self, rating_key, title, item_type="movie", duration=7200000,
-                 view_offset=3600000, grandparent_title=None):
+    def __init__(
+        self,
+        rating_key,
+        title,
+        item_type="movie",
+        duration=7200000,
+        view_offset=3600000,
+        grandparent_title=None,
+    ):
         self.ratingKey = rating_key
         self.title = title
         self.type = item_type
@@ -711,8 +896,17 @@ class DummyShowSection:
 class DummyPlexServerExtended(DummyPlexServer):
     """Extended dummy server supporting shows, music, history, and on-deck."""
 
-    def __init__(self, movies=None, playlists=None, shows=None, artists=None,
-                 albums=None, tracks=None, history=None, on_deck=None):
+    def __init__(
+        self,
+        movies=None,
+        playlists=None,
+        shows=None,
+        artists=None,
+        albums=None,
+        tracks=None,
+        history=None,
+        on_deck=None,
+    ):
         super().__init__(movies, playlists)
         self._shows = shows or []
         self._artists = artists or []
@@ -721,15 +915,23 @@ class DummyPlexServerExtended(DummyPlexServer):
         self._history = history or []
         self._on_deck = on_deck or []
         self.library = DummyLibraryExtended(
-            movies=movies, shows=shows, artists=artists, albums=albums, tracks=tracks,
+            movies=movies,
+            shows=shows,
+            artists=artists,
+            albums=albums,
+            tracks=tracks,
             on_deck=on_deck,
         )
 
     def fetchItem(self, key):
         from plexapi.exceptions import NotFound
+
         all_items = (
-            (self._movies or []) + self._shows + self._artists +
-            self._albums + self._tracks
+            (self._movies or [])
+            + self._shows
+            + self._artists
+            + self._albums
+            + self._tracks
         )
         item = next((i for i in all_items if i.ratingKey == key), None)
         if item is None:
@@ -747,8 +949,15 @@ class DummyPlexServerExtended(DummyPlexServer):
 
 
 class DummyLibraryExtended(DummyLibrary):
-    def __init__(self, movies=None, shows=None, artists=None, albums=None, tracks=None,
-                 on_deck=None):
+    def __init__(
+        self,
+        movies=None,
+        shows=None,
+        artists=None,
+        albums=None,
+        tracks=None,
+        on_deck=None,
+    ):
         super().__init__(movies)
         self._shows = shows or []
         self._artists = artists or []
@@ -790,12 +999,26 @@ class DummyLibraryExtended(DummyLibrary):
 @pytest.fixture
 def patch_plex_extended(monkeypatch):
     """Fixture to patch get_plex_server with DummyPlexServerExtended."""
-    def _patch(movies=None, playlists=None, shows=None, artists=None,
-               albums=None, tracks=None, history=None, on_deck=None):
+
+    def _patch(
+        movies=None,
+        playlists=None,
+        shows=None,
+        artists=None,
+        albums=None,
+        tracks=None,
+        history=None,
+        on_deck=None,
+    ):
         server = DummyPlexServerExtended(
-            movies=movies, playlists=playlists, shows=shows,
-            artists=artists, albums=albums, tracks=tracks,
-            history=history, on_deck=on_deck,
+            movies=movies,
+            playlists=playlists,
+            shows=shows,
+            artists=artists,
+            albums=albums,
+            tracks=tracks,
+            history=history,
+            on_deck=on_deck,
         )
 
         async def mock_server():
@@ -808,6 +1031,7 @@ def patch_plex_extended(monkeypatch):
 
 
 # --- Tests for most_watched ---
+
 
 @pytest.mark.asyncio
 async def test_most_watched_movies(patch_plex_extended):
@@ -826,6 +1050,7 @@ async def test_most_watched_movies(patch_plex_extended):
 async def test_most_watched_invalid_type(patch_plex_extended):
     """Test most_watched returns error for invalid media_type."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     patch_plex_extended()
     with pytest.raises(PlexMCPError):
         await most_watched(media_type="podcasts")
@@ -835,19 +1060,33 @@ async def test_most_watched_invalid_type(patch_plex_extended):
 async def test_most_watched_invalid_count(patch_plex_extended):
     """Test most_watched returns error for non-positive count."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     patch_plex_extended()
     with pytest.raises(PlexMCPError):
         await most_watched(count=0)
 
 
+@pytest.mark.asyncio
+async def test_most_watched_shows(patch_plex_extended):
+    """Test most_watched returns shows when media_type='shows'."""
+    shows = [DummyShow(1, "Breaking Bad"), DummyShow(2, "Better Call Saul")]
+    patch_plex_extended(shows=shows)
+    result = await most_watched(media_type="shows", count=5)
+    assert "Breaking Bad" in result
+    assert "Better Call Saul" in result
+
+
 # --- Tests for get_watch_history ---
+
 
 @pytest.mark.asyncio
 async def test_get_watch_history_found(patch_plex_extended):
     """Test get_watch_history returns recently watched items."""
     history = [
         DummyHistoryItem(1, "Watched Movie", item_type="movie"),
-        DummyHistoryItem(2, "Episode Title", item_type="episode", grandparent_title="My Show"),
+        DummyHistoryItem(
+            2, "Episode Title", item_type="episode", grandparent_title="My Show"
+        ),
     ]
     patch_plex_extended(history=history)
     result = await get_watch_history(count=10)
@@ -868,6 +1107,7 @@ async def test_get_watch_history_empty(patch_plex_extended):
 async def test_get_watch_history_invalid_count(patch_plex_extended):
     """Test get_watch_history returns error for non-positive count."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     patch_plex_extended()
     with pytest.raises(PlexMCPError):
         await get_watch_history(count=0)
@@ -881,13 +1121,18 @@ async def test_get_watch_history_unresolvable_account(patch_plex_extended):
     # Patch the server so the authenticated username doesn't match any system account.
     server = patch_plex_extended(history=[])
     server.myPlexAccount = lambda: type("Acct", (), {"username": "ghost"})()
-    server.systemAccounts = lambda: [type("SA", (), {"id": 1, "name": "someone_else"})()]
+    server.systemAccounts = lambda: [
+        type("SA", (), {"id": 1, "name": "someone_else"})()
+    ]
 
-    with pytest.raises(PlexMCPError, match="Could not resolve the authenticated user account"):
+    with pytest.raises(
+        PlexMCPError, match="Could not resolve the authenticated user account"
+    ):
         await get_watch_history()
 
 
 # --- Tests for get_on_deck ---
+
 
 @pytest.mark.asyncio
 async def test_get_on_deck_empty(patch_plex_extended):
@@ -918,6 +1163,7 @@ async def test_get_on_deck_with_items(monkeypatch):
 
 # --- Tests for get_library_stats ---
 
+
 @pytest.mark.asyncio
 async def test_get_library_stats_with_movies(patch_plex_extended):
     """Test get_library_stats returns stats for movie library."""
@@ -943,6 +1189,7 @@ async def test_get_library_stats_empty(monkeypatch):
 
 
 # --- Tests for search_tv_shows ---
+
 
 @pytest.mark.asyncio
 async def test_search_tv_shows_found(patch_plex_extended):
@@ -974,6 +1221,7 @@ async def test_search_tv_shows_limit(patch_plex_extended):
 
 # --- Tests for get_show_details ---
 
+
 @pytest.mark.asyncio
 async def test_get_show_details_found(patch_plex_extended):
     """Test get_show_details returns show info and seasons."""
@@ -989,12 +1237,14 @@ async def test_get_show_details_found(patch_plex_extended):
 async def test_get_show_details_not_found(patch_plex_extended):
     """Test get_show_details returns error when show key not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_plex_extended(shows=[])
     with pytest.raises(PlexMCPNotFoundError):
         await get_show_details("999")
 
 
 # --- Tests for get_similar_movies ---
+
 
 @pytest.mark.asyncio
 async def test_get_similar_movies_none(patch_plex_extended):
@@ -1021,12 +1271,14 @@ async def test_get_similar_movies_found(patch_plex_extended):
 async def test_get_similar_movies_not_found(patch_plex_extended):
     """Test get_similar_movies returns error when movie key not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_plex_extended(movies=[])
     with pytest.raises(PlexMCPNotFoundError):
         await get_similar_movies("999")
 
 
 # --- Tests for get_similar_artists ---
+
 
 @pytest.mark.asyncio
 async def test_get_similar_artists_none(patch_plex_extended):
@@ -1053,12 +1305,14 @@ async def test_get_similar_artists_found(patch_plex_extended):
 async def test_get_similar_artists_not_found(patch_plex_extended):
     """Test get_similar_artists raises error when artist key not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_plex_extended(artists=[])
     with pytest.raises(PlexMCPNotFoundError):
         await get_similar_artists("999")
 
 
 # --- Tests for search_music ---
+
 
 @pytest.mark.asyncio
 async def test_search_music_by_artist(patch_plex_extended):
@@ -1083,8 +1337,14 @@ async def test_search_music_by_album(patch_plex_extended):
 @pytest.mark.asyncio
 async def test_search_music_by_track(patch_plex_extended):
     """Test search_music finds tracks by title."""
-    tracks = [DummyTrack(1, "Come Together", parent_title="Abbey Road",
-                         grandparent_title="The Beatles")]
+    tracks = [
+        DummyTrack(
+            1,
+            "Come Together",
+            parent_title="Abbey Road",
+            grandparent_title="The Beatles",
+        )
+    ]
     patch_plex_extended(tracks=tracks)
     result = await search_music(track="Come Together")
     assert "Come Together" in result
@@ -1095,6 +1355,7 @@ async def test_search_music_by_track(patch_plex_extended):
 async def test_search_music_no_params(patch_plex_extended):
     """Test search_music returns error when no search params given."""
     from plex_mcp.plex_mcp import PlexMCPError
+
     patch_plex_extended()
     with pytest.raises(PlexMCPError):
         await search_music()
@@ -1109,6 +1370,7 @@ async def test_search_music_not_found(patch_plex_extended):
 
 
 # --- Tests for get_artist_details ---
+
 
 @pytest.mark.asyncio
 async def test_get_artist_details_found(patch_plex_extended):
@@ -1125,6 +1387,7 @@ async def test_get_artist_details_found(patch_plex_extended):
 async def test_get_artist_details_not_found(patch_plex_extended):
     """Test get_artist_details returns error when artist not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_plex_extended(artists=[])
     with pytest.raises(PlexMCPNotFoundError):
         await get_artist_details("999")
@@ -1132,10 +1395,13 @@ async def test_get_artist_details_not_found(patch_plex_extended):
 
 # --- Tests for get_album_details ---
 
+
 @pytest.mark.asyncio
 async def test_get_album_details_found(patch_plex_extended):
     """Test get_album_details returns album info and track listing with keys."""
-    album = DummyAlbum(1, "Abbey Road", parent_title="The Beatles", year=1969, leaf_count=5)
+    album = DummyAlbum(
+        1, "Abbey Road", parent_title="The Beatles", year=1969, leaf_count=5
+    )
     patch_plex_extended(albums=[album])
     result = await get_album_details("1")
     assert "Abbey Road" in result
@@ -1149,6 +1415,7 @@ async def test_get_album_details_found(patch_plex_extended):
 async def test_get_album_details_not_found(patch_plex_extended):
     """Test get_album_details returns error when album not found."""
     from plex_mcp.plex_mcp import PlexMCPNotFoundError
+
     patch_plex_extended(albums=[])
     with pytest.raises(PlexMCPNotFoundError):
         await get_album_details("999")

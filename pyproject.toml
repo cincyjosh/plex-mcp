@@ -12,6 +12,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
+    "ruff>=0.15.8",
 ]
+
+[tool.mypy]
+python_version = "3.13"
+strict = false
+ignore_missing_imports = true
